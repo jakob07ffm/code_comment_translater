@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comment Translator</title>
+    <style>
+        /* Basic reset */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        /* Font-face rule to load custom font */
+        @font-face {
+            font-family: 'CustomFont';
+            src: url('font.ttf') format('truetype');
+        }
+        /* Body styles */
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #f0f0f0;
+            font-family: 'CustomFont', Arial, sans-serif;
+        }
+        /* Main container styles */
+        .main-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            border-radius: 10px;
+            background-color: #fff;
+            box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
+        }
+        /* Title styles */
+        h1 {
+            margin-bottom: 20px;
+            font-size: 32px;
+            color: #333;
+        }
+        /* Form styles */
+        form {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        /* Input and select styles */
+        input, select, textarea {
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            width: 250px;
+        }
+        /* Button styles */
+        .button {
+            background-color: #4CAF50;
+            border: none;
+            border-radius: 5px;
+            padding: 15px;
+            width: 250px;
+            text-align: center;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            text-decoration: none;
+            color: #fff;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background-color 0.3s ease, transform 0.3s ease;
+        }
+        .button:hover {
+            background-color: #45a049;
+            transform: translateY(-2px);
+        }
+        .button:active {
+            background-color: #3e8e41;
+        }
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <h1>Comment Translator</h1>
+        <form id="translatorForm">
+            <select id="commentType" required>
+                <option value="">Select Comment Type</option>
+                <option value="python">Python ... "#"</option>
+                <option value="csharp">C# ... "///"</option>
+                <option value="html">HTML ... "// & /**/"</option>
+            </select>
+            <select id="sourceLang" required>
+                <option value="">Source Language</option>
+                <option value="en">English</option>
+                <option value="de">Deutsch</option>
+                <option value="es">Español</option>
+                <option value="fr">Français</option>
+                <option value="it">Italiano</option>
+                <!-- Add more languages as needed -->
+            </select>
+            <select id="targetLang" required>
+                <option value="">Target Language</option>
+                <option value="en">English</option>
+                <option value="de">Deutsch</option>
+                <option value="es">Español</option>
+                <option value="fr">Français</option>
+                <option value="it">Italiano</option>
+                <!-- Add more languages as needed -->
+            </select>
+            <textarea id="codeInput" placeholder="Paste your code here" rows="10" required></textarea>
+            <button type="submit" class="button">Translate Comments</button>
+        </form>
+        <textarea id="translatedCode" placeholder="Translated code will appear here" rows="10" readonly></textarea>
+    </div>
+
+    <!-- Import mtranslate library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mtranslate/1.0.0/mtranslate.min.js"></script>
+    <script>
+        document.getElementById('translatorForm').addEventListener('submit', async function(event) {
+            event.preventDefault();
+
+            const commentType = document.getElementById('commentType').value;
+            const sourceLang = document.getElementById('sourceLang').value;
+            const targetLang = document.getElementById('targetLang').value;
+            const codeInput = document.getElementById('codeInput').value;
+            const translatedCodeElement = document.getElementById('translatedCode');
+
+            if (!commentType || !sourceLang || !targetLang) {
+                alert('Please select comment type, source language, and target language.');
+                return;
+            }
+
+            let commentRegex;
+            switch (commentType) {
+                case 'python':
+                    commentRegex = /#(.*)/g;
+                    break;
+                case 'csharp':
+                    commentRegex = /\/\/\/(.*)/g;
+                    break;
+                case 'html':
+                    commentRegex = /\/\/(.*)|\/\*([\s\S]*?)\*\//g;
+                    break;
+                default:
+                    alert('Please select a valid comment type');
+                    return;
+            }
+
+            try {
+                const translatedCode = await translateComments(codeInput, commentRegex, sourceLang, targetLang);
+                translatedCodeElement.value = translatedCode;
+            } catch (error) {
+                alert('An error occurred while translating comments.');
+                console.error(error);
+            }
+        });
+
+        async function translateComments(code, regex, sourceLang, targetLang) {
+            const matches = [...code.matchAll(regex)];
+            if (matches.length === 0) {
+                alert('No comments found in the code');
+                return code;
+            }
+
+            const translations = await Promise.all(matches.map(async (match) => {
+                let originalComment = match[0];
+                let commentText;
+                if (match[1]) {
+                    commentText = match[1].trim();
+                } else {
+                    commentText = match[2] ? match[2].trim() : '';
+                }
+                const translatedText = await translateText(commentText, sourceLang, targetLang);
+                return { originalComment, translatedText };
+            }));
+
+            let translatedCode = code;
+            translations.forEach(({ originalComment, translatedText }) => {
+                const commentPrefix = originalComment.split(/(?=\S)/)[0];
+                translatedCode = translatedCode.replace(originalComment, `${commentPrefix}${translatedText}`);
+            });
+
+            return translatedCode;
+        }
+
+        async function translateText(text, sourceLang, targetLang) {
+            return new Promise((resolve, reject) => {
+                mtranslate(text, { from: sourceLang, to: targetLang }, function(result) {
+                    resolve(result);
+                });
+            });
+        }
+    </script>
+</body>
+</html>
